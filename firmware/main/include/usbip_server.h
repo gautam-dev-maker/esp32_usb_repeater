@@ -11,6 +11,8 @@
 #include "esp_intr_alloc.h"
 #include "usb/usb_host.h"
 
+#include "tcp_connect.h"
+
 esp_err_t usbip_server_init();
 
 #endif
