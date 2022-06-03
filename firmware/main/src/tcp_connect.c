@@ -31,13 +31,6 @@ static void do_recv(const int sock)
         else
         {
             rx_buffer[len] = 0; // Null-terminate whatever is received and treat it like a string
-            // char s[] = "Hello";
-            char *cp = rx_buffer;
-            for (; *cp != '\0'; ++cp)
-            {
-                printf("%02x", *cp);
-            }
-
             ESP_LOGI(TAG, "Received %d bytes: %s", len, rx_buffer);
         }
     } while (len > 0);
