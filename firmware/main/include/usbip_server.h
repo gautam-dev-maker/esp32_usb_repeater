@@ -12,11 +12,20 @@
 #include "usb/usb_host.h"
 
 #include "tcp_connect.h"
+#include "usb_handler.h"
+#include "global.h"
 
 #define USBIP_VERSION 0x0111
 #define BUS_ID "3-2"
 
 typedef struct
+{
+    uint16_t usbip_version;
+    uint16_t command_code;
+    uint32_t status;
+} op_req_devlist_t;
+
+typedef struct op_rep_devlist_t
 {
     uint16_t usbip_version;
     uint16_t reply_code;
@@ -56,7 +65,7 @@ typedef struct
     uint16_t usbip_version;
     uint32_t command_code;
     uint32_t status;
-    char bus_id[32]; 
+    char bus_id[32];
 } op_req_import_t;
 
 typedef struct
@@ -102,9 +111,9 @@ typedef struct
     uint32_t error_count;
 } usbip_ret_submit_t;
 
-typedef struct 
+typedef struct
 {
-   uint32_t unlink_seqnum;
+    uint32_t unlink_seqnum;
 } usbip_cmd_unlink_t;
 
 typedef struct
@@ -112,6 +121,10 @@ typedef struct
     uint32_t status;
 } usbip_ret_unlink_t;
 
+/* Initialise USB/IP Server */
 esp_err_t usbip_server_init();
+
+/* Stop the USB/IP Server and deletes all the tasks */
+esp_err_t usbip_server_stop();
 
 #endif
