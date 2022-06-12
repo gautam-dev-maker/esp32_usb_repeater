@@ -5,6 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#include "usbip_server.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_intr_alloc.h"
@@ -25,6 +26,8 @@ typedef struct
 /* This function will keep checking for USB Devices */
 void usb_host_lib_daemon_task(void *arg);
 void usb_class_driver_task(void *arg);
+
+typedef struct op_rep_devlist_t op_rep_devlist_t;
 
 /* Fills the ope_rep_devlist_t struct with the required information */
 esp_err_t get_op_rep_devlist(op_rep_devlist_t *dev);
