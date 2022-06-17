@@ -21,8 +21,6 @@ static const usb_device_desc_t *dev_desc;
 static const usb_config_desc_t *config_desc;
 static const usb_intf_desc_t *interface_desc;
 
-SemaphoreHandle_t signaling_sem;
-
 static void client_event_cb(const usb_host_client_event_msg_t *event_msg, void *arg)
 {
     class_driver_t *driver_obj = (class_driver_t *)arg;
@@ -164,6 +162,8 @@ esp_err_t get_op_rep_devlist(op_rep_devlist_t *dev)
 
 void usb_class_driver_task(void *arg)
 {
+    SemaphoreHandle_t signaling_sem = (SemaphoreHandle_t)arg;
+    
     /* Stores all the information with regards to the USB */
     class_driver_t driver_obj;
     while (1)
@@ -238,7 +238,7 @@ void usb_class_driver_task(void *arg)
 
 void usb_host_lib_daemon_task(void *arg)
 {
-    SemaphoreHandle_t signaling_sem = xSemaphoreCreateBinary();
+    SemaphoreHandle_t signaling_sem = (SemaphoreHandle_t)arg;
     /* This will keep on looking for USB Devices */
     while (1)
     {
