@@ -27,9 +27,12 @@ typedef struct
 void usb_host_lib_daemon_task(void *arg);
 void usb_class_driver_task(void *arg);
 
-typedef struct op_rep_devlist_t op_rep_devlist_t;
+typedef struct op_rep_devlist_t op_rep_devlist;
+
+/* Pointer for struct op_rep_devlist_t*/
+op_rep_devlist *dev;
 
 /* Fills the ope_rep_devlist_t struct with the required information */
-esp_err_t get_op_rep_devlist(op_rep_devlist_t *dev);
+void get_op_rep_devlist_function(op_rep_devlist *dev);
 
 #endif
