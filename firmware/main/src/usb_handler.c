@@ -129,7 +129,7 @@ static void aciton_close_dev(class_driver_t *driver_obj)
 }
 
 /* Fills the dev struct with all the required information */
-esp_err_t get_op_rep_devlist(op_rep_devlist_t *dev)
+void get_op_rep_devlist_function(op_rep_devlist *dev)
 {
     dev->usbip_version = USBIP_VERSION;
     dev->reply_code = 0x0005;
@@ -156,8 +156,6 @@ esp_err_t get_op_rep_devlist(op_rep_devlist_t *dev)
     dev->b_interface_sub_class = interface_desc->bInterfaceSubClass;
     dev->b_interface_protocol = interface_desc->bInterfaceProtocol;
     dev->padding = 0x00;
-
-    return ESP_OK;
 }
 
 void usb_class_driver_task(void *arg)
@@ -192,10 +190,6 @@ void usb_class_driver_task(void *arg)
             }
             else
             {
-                /* Starting the TCP server on Device Detection */
-                xTaskCreate(tcp_server_start, "TCP Server Start", 4096, NULL, 5, tcp_server_task);
-                vTaskDelay(10);
-
                 if (driver_obj.actions & ACTION_OPEN_DEV)
                 {
                     action_open_dev(&driver_obj);
@@ -226,6 +220,12 @@ void usb_class_driver_task(void *arg)
                     /* TODO : Delete the TCP SERVER TASK and free up the resource */
                     break;
                 }
+
+                get_op_rep_devlist_function(&dev);
+
+                /* Starting the TCP server on Device Detection */
+                xTaskCreate(tcp_server_start, "TCP Server Start", 4096, NULL, 5, tcp_server_task);
+                vTaskDelay(10);
             }
         }
 
