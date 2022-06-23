@@ -28,6 +28,7 @@ void usb_host_lib_daemon_task(void *arg);
 void usb_class_driver_task(void *arg);
 
 typedef struct op_rep_devlist_t op_rep_devlist;
+typedef struct op_req_devlist_t op_req_devlist;
 
 /* Pointer for struct op_rep_devlist_t*/
 op_rep_devlist *dev;
