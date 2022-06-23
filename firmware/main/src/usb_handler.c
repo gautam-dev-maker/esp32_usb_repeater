@@ -131,21 +131,21 @@ static void aciton_close_dev(class_driver_t *driver_obj)
 /* Fills the dev struct with all the required information */
 void get_op_rep_devlist_function(op_rep_devlist *dev)
 {
-    dev->usbip_version = USBIP_VERSION;
-    dev->reply_code = 0x0005;
-    dev->status = 0x00000000;
-    dev->no_of_device = 0x00000001;
+    dev->usbip_version = htons(USBIP_VERSION);
+    dev->reply_code = htons(0x0005);
+    dev->status = htonl(0x00000000);
+    dev->no_of_device = htonl(0x00000001);
     strcpy(dev->path, "/sys/devices/pci0000:00/0000:00:1d.1/usb2/3-2");
     strcpy(dev->bus_id, BUS_ID);
 
     /* Not sure about these */
-    dev->busnum = 1;
-    dev->devnum = 1;
+    dev->busnum = htonl(1);
+    dev->devnum = htonl(1);
 
-    dev->speed = dev_info.speed;
-    dev->id_vendor = dev_desc->idVendor;
-    dev->id_product = dev_desc->idProduct;
-    dev->bcd_device = dev_desc->bcdDevice;
+    dev->speed = htonl(dev_info.speed);
+    dev->id_vendor = htons(dev_desc->idVendor);
+    dev->id_product = htons(dev_desc->idProduct);
+    dev->bcd_device = htons(dev_desc->bcdDevice);
     dev->b_device_class = dev_desc->bDeviceClass;
     dev->b_device_sub_class = dev_desc->bDeviceSubClass;
     dev->b_device_protocol = dev_desc->bDeviceProtocol;
@@ -221,7 +221,7 @@ void usb_class_driver_task(void *arg)
                     break;
                 }
 
-                get_op_rep_devlist_function(&dev);
+                //get_op_rep_devlist_function(&dev);
 
                 /* Starting the TCP server on Device Detection */
                 xTaskCreate(tcp_server_start, "TCP Server Start", 4096, NULL, 5, tcp_server_task);
