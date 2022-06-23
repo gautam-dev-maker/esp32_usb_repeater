@@ -2,6 +2,10 @@
 
 #define TAG "TCP_CONNECT"
 
+op_rep_devlist *dev_tcp;
+
+op_req_devlist dev_recv;
+
 esp_err_t tcp_server_init(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init());
@@ -15,25 +19,27 @@ esp_err_t tcp_server_init(void)
 static void do_recv(const int sock)
 {
     int len;
-    char rx_buffer[128];
 
-    do
+    len = recv(sock, &dev_recv, sizeof(struct op_req_devlist_t), 0);
+    if (len < 0)
     {
-        len = recv(sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
-        if (len < 0)
+        ESP_LOGE(TAG, "Error occurred during receiving: errno %d", errno);
+    }
+    else if (len == 0)
+    {
+        ESP_LOGW(TAG, "Connection closed");
+    }
+    else
+    {
+        printf("USBIP Version: %u\n", ntohs(dev_recv.usbip_version));
+        printf("Command Code: %u\n", ntohs(dev_recv.command_code));
+        printf("Status: %u\n", ntohl(dev_recv.status));
+        if (ntohs(dev_recv.command_code) == 0x8005)
         {
-            ESP_LOGE(TAG, "Error occurred during receiving: errno %d", errno);
+            get_op_rep_devlist_function(&dev_tcp);
+            send(sock, &dev_tcp, sizeof(struct op_rep_devlist_t), 0);
         }
-        else if (len == 0)
-        {
-            ESP_LOGW(TAG, "Connection closed");
-        }
-        else
-        {
-            rx_buffer[len] = 0; // Null-terminate whatever is received and treat it like a string
-            ESP_LOGI(TAG, "Received %d bytes: %s", len, rx_buffer);
-        }
-    } while (len > 0);
+    }
 }
 
 void tcp_server_start(void *pvParameters)
