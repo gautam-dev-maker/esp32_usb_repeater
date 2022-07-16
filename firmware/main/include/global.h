@@ -12,8 +12,6 @@ extern TaskHandle_t *tcp_server_task;
 extern TaskHandle_t *usb_daemon_task_hdl;
 extern TaskHandle_t *usb_class_driver_task_hdl;
 
-extern SemaphoreHandle_t signaling_sem;
-
 extern struct class_driver_t driver_obj;
 
 #endif
