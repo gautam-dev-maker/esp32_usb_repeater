@@ -2,10 +2,6 @@
 
 #define TAG "TCP_CONNECT"
 
-op_rep_devlist *dev_tcp;
-
-op_req_devlist dev_recv;
-
 esp_err_t tcp_server_init(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init());
@@ -19,7 +15,7 @@ esp_err_t tcp_server_init(void)
 static void do_recv(const int sock)
 {
     int len;
-
+    op_req_devlist dev_recv;
     len = recv(sock, &dev_recv, sizeof(struct op_req_devlist_t), 0);
     if (len < 0)
     {
@@ -34,6 +30,7 @@ static void do_recv(const int sock)
         printf("USBIP Version: %u\n", ntohs(dev_recv.usbip_version));
         printf("Command Code: %u\n", ntohs(dev_recv.command_code));
         printf("Status: %u\n", ntohl(dev_recv.status));
+        op_rep_devlist dev_tcp;
         if (ntohs(dev_recv.command_code) == 0x8005)
         {
             get_op_rep_devlist_function(&dev_tcp);
