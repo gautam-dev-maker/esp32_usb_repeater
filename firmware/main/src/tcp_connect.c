@@ -2,6 +2,9 @@
 
 #define TAG "TCP_CONNECT"
 
+/* TODO: Make the variable "device_busy" false if the usb is unbound */
+bool device_busy = false;
+
 esp_err_t tcp_server_init(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init());
@@ -15,11 +18,10 @@ esp_err_t tcp_server_init(void)
 static void do_recv(const int sock)
 {
     int len;
-    char rx_buffer[128];
-
-    do
+    if (!device_busy)
     {
-        len = recv(sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
+        op_req_devlist dev_recv;
+        len = recv(sock, &dev_recv, sizeof(op_req_devlist), 0);
         if (len < 0)
         {
             ESP_LOGE(TAG, "Error occurred during receiving: errno %d", errno);
@@ -28,12 +30,44 @@ static void do_recv(const int sock)
         {
             ESP_LOGW(TAG, "Connection closed");
         }
-        else
+        else if (ntohs(dev_recv.usbip_version) == USBIP_VERSION)
         {
-            rx_buffer[len] = 0; // Null-terminate whatever is received and treat it like a string
-            ESP_LOGI(TAG, "Received %d bytes: %s", len, rx_buffer);
+            switch (ntohs(dev_recv.command_code))
+            {
+            case OP_REQ_DEVLIST:;
+                op_rep_devlist dev_tcp;
+                get_op_rep_devlist(&dev_tcp);
+                send(sock, &dev_tcp, sizeof(op_rep_devlist), 0);
+                break;
+
+            case OP_REQ_IMPORT:;
+                /* TODO: perform error check as perfomed above after receiving */
+                op_req_import dev_import;
+                recv(sock, dev_import.bus_id, sizeof(op_req_import) - sizeof(op_req_devlist), 0);
+                if (!strcmp(BUS_ID, dev_import.bus_id))
+                {
+                    ESP_LOGI(TAG, "BUS-ID matches for requested import device");
+
+                    /* TODO: send a "op_rep_import" struct as a reply */
+                    op_rep_import rep_import;
+                    get_op_rep_import(&rep_import);
+                    send(sock, &rep_import, sizeof(op_rep_import), 0);
+
+                    /* TODO: if send is successful set device_busy true */
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "Received different BUS ID");
+                    /* TODO: reply with "1" status to show error in connection*/
+                }
+                break;
+            }
         }
-    } while (len > 0);
+    }
+    else
+    {
+        /* TODO : Start dealing with URB command codes */
+    }
 }
 
 void tcp_server_start(void *pvParameters)

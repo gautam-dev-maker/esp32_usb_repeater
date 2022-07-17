@@ -17,6 +17,9 @@
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
 #include <lwip/netdb.h>
+#include <arpa/inet.h>
+
+#include "usb_handler.h"
 
 #define PORT                        3240
 #define KEEPALIVE_IDLE              100
