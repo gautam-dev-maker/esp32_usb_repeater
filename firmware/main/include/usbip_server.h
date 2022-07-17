@@ -18,12 +18,24 @@
 #define USBIP_VERSION 0x0111
 #define BUS_ID "3-2"
 
+/* Command code */
+#define OP_REQ_DEVLIST 0x8005
+#define OP_REQ_IMPORT 0x8003
+#define USBIP_CMD_SUBMIT 0x00000001
+#define USBIP_RET_SUBMIT 0x00000003
+#define USBIP_CMD_UNLINK 0x00000002
+#define USBIP_RET_UNLINK 0x00000004
+
+/* Reply Code */
+#define OP_REP_DEVLIST 0x0005
+#define OP_REP_IMPORT 0x0003
+
 typedef struct op_req_devlist_t
 {
     uint16_t usbip_version;
     uint16_t command_code;
     uint32_t status;
-} __attribute__((packed));
+} __attribute__((packed)) op_req_devlist;
 
 typedef struct op_rep_devlist_t
 {
@@ -49,7 +61,7 @@ typedef struct op_rep_devlist_t
     uint8_t b_interface_sub_class;
     uint8_t b_interface_protocol;
     uint8_t padding;
-} __attribute__((packed));
+} __attribute__((packed)) op_rep_devlist;
 
 typedef struct usbip_header_basic_t
 {
@@ -58,7 +70,7 @@ typedef struct usbip_header_basic_t
     uint32_t devid;
     uint32_t direction;
     uint32_t ep;
-} __attribute__((packed));
+} __attribute__((packed)) usbip_header_basic;
 
 typedef struct op_req_import_t
 {
@@ -66,12 +78,12 @@ typedef struct op_req_import_t
     uint32_t command_code;
     uint32_t status;
     char bus_id[32];
-} __attribute__((packed));
+} __attribute__((packed)) op_req_import;
 
 typedef struct op_rep_import_t
 {
     uint16_t usbip_version;
-    uint32_t reply_code;
+    uint16_t reply_code;
     uint32_t status;
     char path[256];
     char bus_id[32];
@@ -88,7 +100,7 @@ typedef struct op_rep_import_t
     uint8_t b_num_configurations;
     uint8_t b_num_interfaces;
 
-} __attribute__((packed));
+} __attribute__((packed)) op_rep_import;
 
 typedef struct usbip_cmd_submit_t
 {
@@ -100,7 +112,7 @@ typedef struct usbip_cmd_submit_t
     uint32_t interval;
 
     unsigned char setup[8];
-} __attribute__((packed));
+} __attribute__((packed)) usbip_cmd_submit;
 
 typedef struct usbip_ret_submit_t
 {
@@ -109,17 +121,17 @@ typedef struct usbip_ret_submit_t
     uint32_t start_frame;
     uint32_t number_of_packets;
     uint32_t error_count;
-} __attribute__((packed));
+} __attribute__((packed)) usbip_ret_submit;
 
 typedef struct usbip_cmd_unlink_t
 {
     uint32_t unlink_seqnum;
-} __attribute__((packed));
+} __attribute__((packed)) usbip_cmd_unlink;
 
 typedef struct usbip_ret_unlink_t
 {
     uint32_t status;
-} __attribute__((packed));
+} __attribute__((packed)) usbip_ret_unlink;
 
 /* Initialise USB/IP Server */
 esp_err_t usbip_server_init();

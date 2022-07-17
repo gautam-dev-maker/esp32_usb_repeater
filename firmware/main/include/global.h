@@ -14,4 +14,7 @@ extern TaskHandle_t *usb_class_driver_task_hdl;
 
 extern struct class_driver_t driver_obj;
 
+/* This variable is used to determine whether the USB device is bind to any of the network */
+extern bool device_busy;
+
 #endif

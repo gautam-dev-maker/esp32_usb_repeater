@@ -5,15 +5,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
-#include "usbip_server.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_intr_alloc.h"
 #include "usb/usb_host.h"
 
-#include "tcp_connect.h"
 #include "usbip_server.h"
-#include "global.h"
 
 typedef struct
 {
@@ -28,9 +25,12 @@ void usb_host_lib_daemon_task(void *arg);
 void usb_class_driver_task(void *arg);
 
 typedef struct op_rep_devlist_t op_rep_devlist;
-typedef struct op_req_devlist_t op_req_devlist;
+typedef struct op_rep_import_t op_rep_import;
 
-/* Fills the ope_rep_devlist_t struct with the required information */
-void get_op_rep_devlist_function(op_rep_devlist *dev);
+/* Fills the op_rep_devlist struct with the required information */
+void get_op_rep_devlist(op_rep_devlist *dev);
+
+/* Fills the op_rep_import struct with the required information */
+void get_op_rep_import(op_rep_import *dev);
 
 #endif
