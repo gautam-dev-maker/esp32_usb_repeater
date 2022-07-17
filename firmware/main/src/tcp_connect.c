@@ -67,6 +67,22 @@ static void do_recv(const int sock)
     else
     {
         /* TODO : Start dealing with URB command codes */
+        usbip_header_basic header;
+        len = recv(sock, &header, sizeof(usbip_header_basic), 0);
+        if (ntohs(header.usbip_version) == USBIP_VERSION)
+        {
+            switch (ntohl(header.command_code))
+            {
+            case USBIP_CMD_SUBMIT:;
+                /* TODO: REPLY with USBIP_CMD_REP */
+                break;
+
+            case USBIP_CMD_UNLINK:;
+                /* TODO: REPLY with */
+                /* TODO: change device_busy variable to free */
+                break;
+            }
+        }
     }
 }
 
