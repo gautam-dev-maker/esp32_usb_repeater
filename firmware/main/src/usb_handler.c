@@ -1,6 +1,6 @@
 #include "usb_handler.h"
 
-#define CLIENT_NUM_EVENT_MSG 5
+#define CLIENT_NUM_EVENT_MSG 15
 
 #define ACTION_OPEN_DEV 0x01
 #define ACTION_GET_DEV_INFO 0x02
@@ -19,6 +19,12 @@ static usb_device_info_t dev_info;
 static const usb_device_desc_t *dev_desc;
 static const usb_config_desc_t *config_desc;
 static const usb_intf_desc_t *interface_desc;
+static usbip_ret_submit ret_submit;
+static submit recv_submit;
+static class_driver_t driver_obj;
+usb_transfer_t *transfer = NULL;
+const usb_ep_desc_t *ep;
+static int skt;
 
 static void client_event_cb(const usb_host_client_event_msg_t *event_msg, void *arg)
 {
@@ -89,6 +95,9 @@ static void action_get_config_desc(class_driver_t *driver_obj)
     // const usb_config_desc_t *config_desc;
     ESP_ERROR_CHECK(usb_host_get_active_config_descriptor(driver_obj->dev_hdl, &config_desc));
     usb_print_config_descriptor(config_desc, NULL);
+    int offset = 0;
+    const usb_intf_desc_t *intf = usb_parse_interface_descriptor(config_desc, 0, 0, &offset);
+    ep = usb_parse_endpoint_descriptor_by_index(intf, 0, config_desc->wTotalLength, &offset);
     // Get the device's string descriptors next
     driver_obj->actions &= ~ACTION_GET_CONFIG_DESC;
     driver_obj->actions |= ACTION_GET_STR_DESC;
@@ -127,7 +136,7 @@ static void aciton_close_dev(class_driver_t *driver_obj)
     driver_obj->actions |= ACTION_EXIT;
 }
 
-/* Fills the dev struct with all the required information */
+/* Fills the op_rep_devlist struct with all the required information */
 void get_op_rep_devlist(op_rep_devlist *dev)
 {
     dev->usbip_version = htons(USBIP_VERSION);
@@ -135,26 +144,30 @@ void get_op_rep_devlist(op_rep_devlist *dev)
     dev->status = htonl(0x00000000);
     dev->no_of_device = htonl(0x00000001);
 
-    memset(dev->path,0,strlen(dev->path));
+    memset(dev->path, 0, sizeof(dev->path));
     strcpy(dev->path, "/sys/devices/pci0000:00/0000:00:1d.1/usb2/3-2");
-    
-    memset(dev->bus_id, 0, strlen(dev->bus_id));
+
+    memset(dev->bus_id, 0, sizeof(dev->bus_id));
     strcpy(dev->bus_id, BUS_ID);
 
-    /* Not sure about these */
-    dev->busnum = htonl(1);
-    dev->devnum = htonl(1);
+    /* TO-DO: Not sure about these */
+    dev->busnum = htonl(3);
+    dev->devnum = htonl(2);
 
-    dev->speed = htonl(dev_info.speed);
+    /* TO-DO: Verify fields */
+    dev->speed = htonl(dev_info.speed + 1); // currently sendng 1 usb low speed wireless 0x00000005 dev_info.speed
     dev->id_vendor = htons(dev_desc->idVendor);
     dev->id_product = htons(dev_desc->idProduct);
     dev->bcd_device = htons(dev_desc->bcdDevice);
+
     dev->b_device_class = dev_desc->bDeviceClass;
     dev->b_device_sub_class = dev_desc->bDeviceSubClass;
     dev->b_device_protocol = dev_desc->bDeviceProtocol;
+
     dev->b_configuration_value = dev_info.bConfigurationValue;
     dev->b_num_configurations = dev_desc->bNumConfigurations;
     dev->b_num_interfaces = config_desc->bNumInterfaces;
+
     dev->b_interface_class = interface_desc->bInterfaceClass;
     dev->b_interface_sub_class = interface_desc->bInterfaceSubClass;
     dev->b_interface_protocol = interface_desc->bInterfaceProtocol;
@@ -166,26 +179,114 @@ void get_op_rep_import(op_rep_import *dev)
     dev->usbip_version = htons(USBIP_VERSION);
     dev->reply_code = htons(OP_REP_IMPORT);
     dev->status = htonl(0x00000000);
-    
-    memset(dev->bus_id, 0, strlen(dev->bus_id));
-    memset(dev->path,0,strlen(dev->path));
+
+    memset(dev->path, 0, sizeof(dev->path));
     strcpy(dev->path, "/sys/devices/pci0000:00/0000:00:1d.1/usb2/3-2");
+    memset(dev->bus_id, 0, sizeof(dev->bus_id));
     strcpy(dev->bus_id, BUS_ID);
 
     /* Not sure about these */
-    dev->busnum = htonl(1);
-    dev->devnum = htonl(1);
+    dev->busnum = htonl(3);
+    dev->devnum = htonl(2);
 
-    dev->speed = htonl(dev_info.speed);
+    dev->speed = htonl(dev_info.speed + 1);
     dev->id_vendor = htons(dev_desc->idVendor);
     dev->id_product = htons(dev_desc->idProduct);
     dev->bcd_device = htons(dev_desc->bcdDevice);
+
     dev->b_device_class = dev_desc->bDeviceClass;
     dev->b_device_sub_class = dev_desc->bDeviceSubClass;
     dev->b_device_protocol = dev_desc->bDeviceProtocol;
+
     dev->b_configuration_value = dev_info.bConfigurationValue;
     dev->b_num_configurations = dev_desc->bNumConfigurations;
     dev->b_num_interfaces = config_desc->bNumInterfaces;
+}
+
+static void transfer_cb(usb_transfer_t *transfer)
+{
+    // This is function is called from within usb_host_client_handle_events(). Don't block and try to keep it short
+    // struct class_driver_t *driver_obj = (struct class_driver_t *)transfer->context;
+    // usb_host_transfer_submit(transfer);
+    // insert_end();
+    // transfer->data_buffer
+    ESP_LOGI(TAG, "Transfer status %d, actual number of bytes transferred %d\n", transfer->status, transfer->actual_num_bytes);
+    ret_submit.actual_length = htonl(transfer->actual_num_bytes - 8);
+    memcpy(&ret_submit.transfer_buffer[0], transfer->data_buffer + 8, transfer->actual_num_bytes - 8);
+    int len = send(skt, &ret_submit, sizeof(usbip_ret_submit), 0);
+    ESP_LOGI(TAG, "Submitted ret_submit header %d", len);
+    // if (start != NULL)
+    //     send_ret_submit(start->seqnum, &transfer);
+    // usb_host_transfer_submit(transfer);
+    // struct Node *ptr = (struct Node *)malloc(sizeof(struct Node));
+    // ptr = start;
+    // if (start->next != NULL)
+    //     start = start->next;
+    // free(ptr);
+    // driver_obj->actions |= CLASS_DRIVER_ACTION_CLOSE_DEV;
+}
+
+void get_usbip_ret_submit(usbip_cmd_submit *dev, usbip_header_basic *header, int sock)
+{
+    ret_submit.base.command = htonl(USBIP_RET_SUBMIT);
+    ret_submit.base.seqnum = htonl(header->seqnum); // Add Seqnum
+    ret_submit.base.devid = htonl(0x00000000);
+    ret_submit.base.direction = htonl(0x00000000);
+    ret_submit.base.ep = htonl(0x00000000);
+
+    ret_submit.status = htonl(0x00000000);
+    //(66-20)
+    ret_submit.start_frame = htonl(0x00000000);
+    ret_submit.number_of_packets = htonl(0xffffffff);
+    ret_submit.error_count = htonl(0x00000000);
+
+    memset(ret_submit.padding, 0, sizeof(ret_submit.padding));
+    // ret_submit.transfer_buffer.bLength = dev_desc->bLength;
+    // ret_submit.transfer_buffer.bDescriptorType = dev_desc->bDescriptorType;
+    // ret_submit.transfer_buffer.bcdUSB = htons(dev_desc->bcdUSB); //htons(0x2030);
+    // ret_submit.transfer_buffer.bDeviceClass = dev_desc->bDeviceClass;
+    // ret_submit.transfer_buffer.bDeviceSubClass = dev_desc->bDeviceSubClass;
+    // ret_submit.transfer_buffer.bDeviceProtocol = dev_desc->bDeviceProtocol;
+    // ret_submit.transfer_buffer.bMaxPacketSize0 = dev_desc->bMaxPacketSize0;
+
+    recv_submit.base.command = ntohl(header->command);
+    recv_submit.base.seqnum = ntohl(header->seqnum);
+    recv_submit.base.devid = ntohl(header->devid);
+    recv_submit.base.direction = ntohl(header->direction);
+    recv_submit.base.ep = ntohl(header->ep);
+
+    recv_submit.transfer_flags = ntohl(dev->transfer_flags);
+    recv_submit.transfer_buffer_length = ntohl(dev->transfer_buffer_length);
+    recv_submit.start_frame = ntohl(dev->start_frame);
+    recv_submit.interval = ntohl(dev->interval);
+    recv_submit.setup = dev->setup;
+    skt = sock;
+    esp_err_t err = usb_host_transfer_alloc(1000, 0, &transfer);
+    // ESP_LOGI("Host_Allocation", "Return Value %x", err);
+    err = usb_host_interface_claim(driver_obj.client_hdl, driver_obj.dev_hdl, 0, 0);
+    transfer->callback = transfer_cb;
+    transfer->context = &recv_submit;
+    transfer->bEndpointAddress = ep->bEndpointAddress; //(ntohl(header->ep) | (ntohl(header->direction) << 7));
+    // size_t n = ntohl(dev->transfer_buffer_length);
+    memset(transfer->data_buffer, 0x00, 1000);
+    transfer->device_handle = driver_obj.dev_hdl;
+    transfer->num_bytes = sizeof(usb_setup_packet_t) + ntohl(dev->transfer_buffer_length); // ep->wMaxPacketSize;
+    err = usb_host_transfer_submit(transfer);
+    ESP_LOGI(TAG, "Error %x", err);
+}
+
+void get_usbip_ret_unlink(usbip_ret_unlink *dev)
+{
+    // hardcoded
+    dev->base.command = htonl(USBIP_RET_UNLINK);
+    dev->base.seqnum = htonl(0x00000002);
+    dev->base.devid = htonl(0x00000000);
+    dev->base.direction = htonl(0x00000000);
+    dev->base.ep = htonl(0x00000000);
+
+    dev->status = htonl(-ECONNRESET);
+
+    memset(dev->padding, 0, sizeof(dev->padding));
 }
 
 void usb_class_driver_task(void *arg)
@@ -193,7 +294,7 @@ void usb_class_driver_task(void *arg)
     SemaphoreHandle_t signaling_sem = (SemaphoreHandle_t)arg;
 
     /* Stores all the information with regards to the USB */
-    class_driver_t driver_obj;
+
     while (1)
     {
         memset(&driver_obj, 0, sizeof(class_driver_t));
