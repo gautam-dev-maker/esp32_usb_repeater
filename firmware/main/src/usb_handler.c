@@ -168,10 +168,15 @@ void get_op_rep_devlist(op_rep_devlist *dev)
     dev->b_num_configurations = dev_desc->bNumConfigurations;
     dev->b_num_interfaces = config_desc->bNumInterfaces;
 
-    dev->b_interface_class = interface_desc->bInterfaceClass;
-    dev->b_interface_sub_class = interface_desc->bInterfaceSubClass;
-    dev->b_interface_protocol = interface_desc->bInterfaceProtocol;
-    dev->padding = 0x00;
+    int offset = 0;
+    for (size_t n = 0; n < config_desc->bNumInterfaces; n++)
+    {
+        const usb_intf_desc_t *intf = usb_parse_interface_descriptor(config_desc, n, 0, &offset);
+        dev->intfs[n].bInterfaceClass = intf->bInterfaceClass;
+        dev->intfs[n].bInterfaceSubClass = intf->bInterfaceSubClass;
+        dev->intfs[n].bInterfaceProtocol = intf->bInterfaceProtocol;
+        dev->intfs[n].padding  = 0;
+    }
 }
 
 void get_op_rep_import(op_rep_import *dev)

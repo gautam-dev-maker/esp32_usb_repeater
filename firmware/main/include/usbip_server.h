@@ -42,6 +42,13 @@ typedef struct usbip_header_common_t
     uint32_t status;
 } __attribute__((packed)) usbip_header_common;
 
+typedef struct{
+    uint8_t bInterfaceClass;
+    uint8_t bInterfaceSubClass;
+    uint8_t bInterfaceProtocol;
+    uint8_t padding;
+}usbip_interface_t;
+
 typedef struct op_rep_devlist_t
 {
     uint16_t usbip_version;
@@ -63,10 +70,7 @@ typedef struct op_rep_devlist_t
     uint8_t b_num_configurations;
     uint8_t b_num_interfaces;
 
-    uint8_t b_interface_class;
-    uint8_t b_interface_sub_class;
-    uint8_t b_interface_protocol;
-    uint8_t padding;
+    usbip_interface_t intfs[10];
 } __attribute__((packed)) op_rep_devlist;
 
 typedef struct op_req_import_t
