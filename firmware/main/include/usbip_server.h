@@ -142,6 +142,7 @@ typedef struct usbip_cmd_submit_t
     uint32_t interval;
 
     usb_setup_packet_t setup;
+    uint8_t transfer_buffer[1024];
 } __attribute__((packed)) usbip_cmd_submit;
 
 typedef struct usbip_submit_t
@@ -155,6 +156,7 @@ typedef struct usbip_submit_t
     uint32_t interval;
 
     usb_setup_packet_t setup;
+    uint8_t transfer_buffer[1024];
 } __attribute__((packed)) submit;
 
 typedef struct usbip_ret_submit_t
