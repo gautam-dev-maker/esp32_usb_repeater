@@ -6,6 +6,7 @@
 /* TODO: Make the variable "device_busy" false if the usb is unbound */
 bool device_busy = false;
 static int sock;
+static submit recv_submit;
 // static ssize_t size;
 // static char rx_buffer[128];
 
@@ -39,58 +40,21 @@ static void do_recv()
             }
             else if (ntohs(dev_recv.usbip_version) == USBIP_VERSION)
             {
-                switch (ntohs(dev_recv.command_code))
-                {
-                case OP_REQ_DEVLIST:
-                {
-                    op_rep_devlist dev_tcp;
-                    get_op_rep_devlist(&dev_tcp);
-                    send(sock, &dev_tcp, sizeof(op_rep_devlist), 0);
-                    break;
-                }
-
-                case OP_REQ_IMPORT:
-                {
-                    /* TODO: perform error check as perfomed above after receiving */
-                    op_req_import dev_import;
-                    recv(sock, dev_import.bus_id, sizeof(op_req_import) - sizeof(dev_recv), 0);
-                    printf("%s\n", dev_import.bus_id);
-                    if (strcmp(BUS_ID, dev_import.bus_id) == 0)
-                    {
-                        ESP_LOGI(TAG, "BUS-ID matches for requested import device");
-
-                        /* TODO: send a "op_rep_import" struct as a reply */
-                        op_rep_import rep_import;
-                        get_op_rep_import(&rep_import);
-                        len = send(sock, &rep_import, sizeof(rep_import), 0);
-                        if (len > 0)
-                        {
-                            device_busy = true;
-                        }
-                        /* TODO: if send is successful set device_busy true */
-                    }
-                    else
-                    {
-                        ESP_LOGE(TAG, "Received different BUS ID");
-                        /* TODO: reply with "1" status to show error in connection*/
-                    }
-                    // ESP_ERROR_CHECK(esp_event_post_to(usbip_with_task, TASK_EVENTS, OP_REQ_IMPORT, NULL, 0, 10));
-                    break;
-                }
-                }
+                tcp_data buffer;
+                buffer.sock = sock;
+                buffer.len = sizeof(usbip_header_common);
+                buffer.rx_buffer = (uint8_t *)&dev_recv;
+                esp_event_post_to(loop_handle, USBIP_EVENT_BASE, ntohs(dev_recv.command_code), (void *)&buffer, sizeof(tcp_data), 10);
             }
         }
         if (device_busy)
         {
             /* TODO : Start dealing with URB command codes */
             usbip_header_basic header;
-            printf("Enter cmd submit\n");
             len = 0;
             while (1)
             {
                 len = recv(sock, &header, sizeof(usbip_header_basic), 0);
-                // printf("%x\n", ntohl(header.command));
-                // printf("Len: %d\n", len);
 
                 if (len > 0)
                 {
@@ -100,75 +64,35 @@ static void do_recv()
                     {
                         /* TODO: REPLY with USBIP_RET_SUBMIT */
                         usbip_cmd_submit cmd_submit;
-                        ESP_LOGI(TAG, "usbip header basic seqnum: %u", ntohl(header.seqnum));
-                        ESP_LOGI(TAG, "usbip header basic devid: %u", ntohl(header.devid));
-                        ESP_LOGI(TAG, "usbip header basic direcn: %u", ntohl(header.direction));
-                        ESP_LOGI(TAG, "usbip header basic ep: %u", ntohl(header.ep));
-                        ESP_LOGI(TAG, "--------------------------");
                         len = recv(sock, &cmd_submit, sizeof(usbip_cmd_submit), 0);
-                        ESP_LOGI(TAG, "cmd_submit header transfer flag: %u", ntohl(cmd_submit.transfer_flags));
-                        ESP_LOGI(TAG, "cmd_submit header transfer_buffer_length: %u", ntohl(cmd_submit.transfer_buffer_length));
-                        ESP_LOGI(TAG, "cmd_submit header start_frame: %u", ntohl(cmd_submit.start_frame));
-                        ESP_LOGI(TAG, "cmd_submit header number_of_packets: %u", ntohl(cmd_submit.number_of_packets));
-                        ESP_LOGI(TAG, "cmd_submit header interval: %u", ntohl(cmd_submit.interval));
+                        // get_usbip_ret_submit(&cmd_submit, &header, sock);
+                        recv_submit.header = header;
+                        recv_submit.cmd_submit = cmd_submit;
+                        recv_submit.sock = sock;
+                        esp_event_post_to(loop_handle2, USBIP_EVENT_BASE, USBIP_CMD_SUBMIT, (void *)&recv_submit, sizeof(submit), 10);
                         ESP_LOGI(TAG, "--------------------------");
-                        ESP_LOGI(TAG, "----------Setup Packet in Hex--------");
-                        // len = recv(sock, &bmRequestType, sizeof(bmRequestType), 0);
-                        ESP_LOGI(TAG, "cmd_submit header bmRequestType: %x", (cmd_submit.setup.bmRequestType));
-                        // len = recv(sock, &bRequest, sizeof(bRequest),0);
-                        ESP_LOGI(TAG, "cmd_submit header bRequest: %x", cmd_submit.setup.bRequest);
-                        // len = recv(sock, &wValue, sizeof(wValue), 0);
-                        ESP_LOGI(TAG, "cmd_submit header wValue: %x", ntohs(cmd_submit.setup.wValue));
-                        // len = recv(sock, &wIndex, sizeof(wIndex), 0);
-                        ESP_LOGI(TAG, "cmd_submit header wIndex: %x", ntohs(cmd_submit.setup.wIndex));
-                        // len = recv(sock, &wLength, sizeof(wLength), 0);
-                        ESP_LOGI(TAG, "cmd_submit header wLength: %x", ntohs(cmd_submit.setup.wLength));
-                        ESP_LOGI(TAG, "length of cmd_submit %u", len);
-                        ESP_LOGI(TAG, "--------------------------");
-
-                        // usbip_ret_submit ret_submit;
-                        // device_desciptor dev_descrip;
-                        get_usbip_ret_submit(&cmd_submit, &header, sock);
-                        // len = send(sock, &ret_submit, sizeof(usbip_ret_submit), 0);
-                        // ESP_LOGI(TAG, "Submitted ret_submit header %d", len);
-                        // len = send(sock, &dev_descrip, sizeof(device_desciptor), 0);
-                        // ESP_LOGI(TAG, "Submitted ret_submit %d", len);
-                        ESP_LOGI(TAG, "--------------------------");
-
-                        // size = recv(sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
-                        // if ((size) == -1)
-                        // {
-                        //     ESP_LOGI(TAG, "recv: %s (%d)\n", strerror(errno), errno);
-                        // }
-                        // rx_buffer[size] = 0; // Null-terminate whatever is received and treat it like a string
-                        // ESP_LOGI(TAG, "Received %d bytes: %s", size, rx_buffer);
-                        // for (int i = 0; i < size ; ++i) {
-                        //     printf("%u, ", rx_buffer[i]);
-                        // }
                         break;
                     }
 
                     case USBIP_CMD_UNLINK:
                     {
-                        ESP_LOGI(TAG, "------In Unlink-------");
-                        ESP_LOGI(TAG, "usbip header basic seqnum: %u", ntohl(header.seqnum));
-                        ESP_LOGI(TAG, "usbip header basic devid: %u", ntohl(header.devid));
-                        ESP_LOGI(TAG, "usbip header basic direcn: %u", ntohl(header.direction));
-                        ESP_LOGI(TAG, "usbip header basic ep: %u", ntohl(header.ep));
+                        // ESP_LOGI(TAG, "------In Unlink-------");
+                        // ESP_LOGI(TAG, "usbip header basic seqnum: %u", ntohl(header.seqnum));
+                        // ESP_LOGI(TAG, "usbip header basic devid: %u", ntohl(header.devid));
+                        // ESP_LOGI(TAG, "usbip header basic direcn: %u", ntohl(header.direction));
+                        // ESP_LOGI(TAG, "usbip header basic ep: %u", ntohl(header.ep));
 
                         usbip_cmd_unlink cmd_unlink;
                         len = recv(sock, &cmd_unlink, sizeof(usbip_cmd_unlink), 0);
-                        ESP_LOGI(TAG, "usbip header basic ep: %u", ntohl(cmd_unlink.unlink_seqnum));
-                        ESP_LOGI(TAG, "--------------------------");
+                        // ESP_LOGI(TAG, "usbip header basic ep: %u", ntohl(cmd_unlink.unlink_seqnum));
+                        // ESP_LOGI(TAG, "--------------------------");
 
                         /* TODO: REPLY with RET_UNLINK after error check*/
                         // usbip_ret_unlink ret_unlink;
                         // get_usbip_ret_unlink(&ret_unlink);
                         // len = send(sock, &ret_unlink, sizeof(usbip_ret_unlink), 0);
                         // ESP_LOGI(TAG, "Submitted ret_unlink %u", len);
-                        // ESP_LOGI(TAG, "--------------------------");
-
-                        /* TODO: change device_busy variable to free */
+                        // ESP_LOGI(TAG, "--------------------------");/
                         device_busy = false;
                         break;
                     }
