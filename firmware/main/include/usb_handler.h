@@ -9,8 +9,10 @@
 #include "esp_err.h"
 #include "esp_intr_alloc.h"
 #include "usb/usb_host.h"
-
+#include "esp_event.h"
 #include "usbip_server.h"
+
+ESP_EVENT_DECLARE_BASE(USBIP_EVENT_BASE);
 
 typedef struct
 {
@@ -31,14 +33,12 @@ typedef struct usbip_cmd_submit_t usbip_cmd_submit;
 typedef struct usbip_header_basic_t usbip_header_basic;
 typedef struct usbip_ret_unlink_t usbip_ret_unlink;
 
-/* Fills the op_rep_devlist struct with the required information */
-void get_op_rep_devlist(op_rep_devlist *dev);
-
-/* Fills the op_rep_import struct with the required information */
-void get_op_rep_import(op_rep_import *dev);
+usb_device_info_t *get_dev_info();
+const usb_device_desc_t *get_dev_desc();
+const usb_config_desc_t *get_config_desc();
 
 /* Fills the usbip_ret_submit struct with the required information */
-void get_usbip_ret_submit(usbip_cmd_submit *dev, usbip_header_basic* header, int sock);
+void get_usbip_ret_submit(usbip_cmd_submit *dev, usbip_header_basic *header, int sock);
 
 /* Fills the usbip_ret_unlink struct with the required information */
 void get_usbip_ret_unlink(usbip_ret_unlink *dev);

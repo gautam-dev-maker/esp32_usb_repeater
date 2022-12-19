@@ -10,10 +10,13 @@
 #include "usb_handler.h"
 #include "esp_intr_alloc.h"
 #include "usb/usb_host.h"
+#include "esp_event.h"
 
 #include "tcp_connect.h"
 #include "usb_handler.h"
 #include "global.h"
+
+ESP_EVENT_DECLARE_BASE(USBIP_EVENT_BASE);
 
 #define USBIP_VERSION 0x0111
 #define BUS_ID "3-2"
@@ -35,6 +38,13 @@
 /* When UNLINK is successful, status is -ECONNRESET */
 #define ECONNRESET 104
 
+typedef struct tcp_data_t
+{
+    int sock;
+    int len;
+    uint8_t *rx_buffer;
+} __attribute__((packed)) tcp_data;
+
 typedef struct usbip_header_common_t
 {
     uint16_t usbip_version;
@@ -42,12 +52,13 @@ typedef struct usbip_header_common_t
     uint32_t status;
 } __attribute__((packed)) usbip_header_common;
 
-typedef struct{
+typedef struct
+{
     uint8_t bInterfaceClass;
     uint8_t bInterfaceSubClass;
     uint8_t bInterfaceProtocol;
     uint8_t padding;
-}usbip_interface_t;
+} usbip_interface_t;
 
 typedef struct op_rep_devlist_t
 {
@@ -115,13 +126,13 @@ typedef struct usbip_header_basic_t
 typedef struct device_desc_t
 {
 
-    uint8_t bLength;                    /**< Size of the descriptor in bytes */
-    uint8_t bDescriptorType;            /**< DEVICE Descriptor Type */
-    uint16_t bcdUSB;                    /**< USB Specification Release Number in Binary-Coded Decimal (i.e., 2.10 is 210H) */
-    uint8_t bDeviceClass;               /**< Class code (assigned by the USB-IF) */
-    uint8_t bDeviceSubClass;            /**< Subclass code (assigned by the USB-IF) */
-    uint8_t bDeviceProtocol;            /**< Protocol code (assigned by the USB-IF) */
-    uint8_t bMaxPacketSize0;            /**< Maximum packet size for endpoint zero (only 8, 16, 32, or 64 are valid) */
+    uint8_t bLength;         /**< Size of the descriptor in bytes */
+    uint8_t bDescriptorType; /**< DEVICE Descriptor Type */
+    uint16_t bcdUSB;         /**< USB Specification Release Number in Binary-Coded Decimal (i.e., 2.10 is 210H) */
+    uint8_t bDeviceClass;    /**< Class code (assigned by the USB-IF) */
+    uint8_t bDeviceSubClass; /**< Subclass code (assigned by the USB-IF) */
+    uint8_t bDeviceProtocol; /**< Protocol code (assigned by the USB-IF) */
+    uint8_t bMaxPacketSize0; /**< Maximum packet size for endpoint zero (only 8, 16, 32, or 64 are valid) */
 
     // uint16_t idVendor;                  /**< Vendor ID (assigned by the USB-IF) */
     // uint16_t idProduct;                 /**< Product ID (assigned by the manufacturer) */
@@ -130,7 +141,7 @@ typedef struct device_desc_t
     // uint8_t iProduct;                   /**< Index of string descriptor describing product */
     // uint8_t iSerialNumber;              /**< Index of string descriptor describing the device’s serial number */
     // uint8_t bNumConfigurations;         /**< Number of possible configurations */
-}__attribute__((packed)) device_desc;
+} __attribute__((packed)) device_desc;
 
 typedef struct usbip_cmd_submit_t
 {
@@ -147,16 +158,19 @@ typedef struct usbip_cmd_submit_t
 
 typedef struct usbip_submit_t
 {
-    usbip_header_basic base;
-    uint32_t transfer_flags;
-    uint32_t transfer_buffer_length;
+    // usbip_header_basic base;
+    // uint32_t transfer_flags;
+    // uint32_t transfer_buffer_length;
 
-    uint32_t start_frame;
-    uint32_t number_of_packets;
-    uint32_t interval;
+    // uint32_t start_frame;
+    // uint32_t number_of_packets;
+    // uint32_t interval;
 
-    usb_setup_packet_t setup;
-    uint8_t transfer_buffer[1024];
+    // usb_setup_packet_t setup;
+    // uint8_t transfer_buffer[1024];
+    usbip_header_basic header;
+    usbip_cmd_submit cmd_submit;
+    int sock;
 } __attribute__((packed)) submit;
 
 typedef struct usbip_ret_submit_t
