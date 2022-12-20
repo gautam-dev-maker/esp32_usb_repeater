@@ -163,6 +163,7 @@ static void transfer_cb_ctrl(usb_transfer_t *transfer)
     // printf("%s\n", ret_submit.transfer_buffer);
     int len = send(skt, &ret_submit, sizeof(usbip_ret_submit) - 1024 + transfer->actual_num_bytes - 8, 0);
     ESP_LOGI(TAG, "Submitted ret_submit header for transfer_ctrl_submit %d", len);
+    usb_host_transfer_free(transfer);
 }
 
 static void transfer_cb(usb_transfer_t *transfer)
@@ -173,6 +174,7 @@ static void transfer_cb(usb_transfer_t *transfer)
     memcpy(&ret_submit.transfer_buffer[0], transfer->data_buffer, ntohl(ret_submit.actual_length)); // ep->wMaxPacketSize
     int len = send(skt, &ret_submit, sizeof(usbip_ret_submit) - 1024 + ntohl(ret_submit.actual_length), 0);
     ESP_LOGI(TAG, "Submitted ret_submit header for transfer_submit %d", len);
+    usb_host_transfer_free(transfer);
 }
 
 // void get_usbip_ret_submit(usbip_cmd_submit *dev, usbip_header_basic *header, int sock)

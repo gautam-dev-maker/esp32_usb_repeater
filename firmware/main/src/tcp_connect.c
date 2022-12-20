@@ -64,7 +64,7 @@ static void do_recv()
                     {
                         /* TODO: REPLY with USBIP_RET_SUBMIT */
                         usbip_cmd_submit cmd_submit;
-                        len = recv(sock, &cmd_submit, sizeof(usbip_cmd_submit), 0);
+                        len = recv(sock, &cmd_submit, sizeof(usbip_cmd_submit), MSG_DONTWAIT);
                         // get_usbip_ret_submit(&cmd_submit, &header, sock);
                         recv_submit.header = header;
                         recv_submit.cmd_submit = cmd_submit;
@@ -97,7 +97,7 @@ static void do_recv()
                         break;
                     }
                     default:
-                        printf("SUCCESS\n");
+                        printf("Failure\n");
                         break;
                     }
                 }
