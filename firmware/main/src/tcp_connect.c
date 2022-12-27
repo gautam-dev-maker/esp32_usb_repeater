@@ -64,15 +64,15 @@ static void do_recv()
                     {
                         /* TODO: REPLY with USBIP_RET_SUBMIT */
                         usbip_cmd_submit cmd_submit;
-                        len = recv(sock, &cmd_submit, sizeof(usbip_cmd_submit) - 1024, MSG_DONTWAIT);
+                        len += recv(sock, &cmd_submit, sizeof(usbip_cmd_submit) - 1024, MSG_DONTWAIT);
                         if (ntohl(header.direction) == 0)
-                            len += recv(sock, &cmd_submit.transfer_buffer[0], ntohl(cmd_submit.transfer_buffer_length), MSG_DONTWAIT);
-                        // get_usbip_ret_submit(&cmd_submit, &header, sock);
+                            len += recv(sock, &cmd_submit.transfer_buffer[0], ntohl(cmd_submit.transfer_buffer_length), MSG_DONTWAIT); // get_usbip_ret_submit(&cmd_submit, &header, sock);
                         recv_submit.header = header;
                         recv_submit.cmd_submit = cmd_submit;
                         recv_submit.sock = sock;
-                        esp_event_post_to(loop_handle2, USBIP_EVENT_BASE, USBIP_CMD_SUBMIT, (void *)&recv_submit, sizeof(submit), 10);
-                        ESP_LOGI(TAG, "--------------------------");
+                        if (len > 20)
+                            esp_event_post_to(loop_handle2, USBIP_EVENT_BASE, USBIP_CMD_SUBMIT, (void *)&recv_submit, sizeof(submit), 10);
+                        len = 0;
                         break;
                     }
 
@@ -99,7 +99,7 @@ static void do_recv()
                         break;
                     }
                     default:
-                        printf("Failure\n");
+                        printf("SUCCESS\n");
                         break;
                     }
                 }
