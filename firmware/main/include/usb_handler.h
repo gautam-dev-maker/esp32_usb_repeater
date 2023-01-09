@@ -41,6 +41,6 @@ const usb_config_desc_t *get_config_desc();
 void get_usbip_ret_submit(usbip_cmd_submit *dev, usbip_header_basic *header, int sock);
 
 /* Fills the usbip_ret_unlink struct with the required information */
-void get_usbip_ret_unlink(usbip_ret_unlink *dev);
+void init_unlink(uint32_t seqnum);
 
 #endif
