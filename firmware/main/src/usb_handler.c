@@ -21,7 +21,7 @@ static const usb_config_desc_t *config_desc;
 static const usb_intf_desc_t *interface_desc;
 
 static class_driver_t driver_obj;
-const usb_ep_desc_t *ep;
+static uint32_t mps[10];
 static int skt;
 
 // Number Of Interfaces
@@ -43,10 +43,10 @@ const usb_config_desc_t *get_config_desc()
     return config_desc;
 }
 
-class_driver_t *get_driver_obj()
-{
-    return &driver_obj;
-}
+// class_driver_t *get_driver_obj()
+// {
+//     return &driver_obj;
+// }
 
 static void client_event_cb(const usb_host_client_event_msg_t *event_msg, void *arg)
 {
@@ -117,15 +117,18 @@ static void action_get_config_desc(class_driver_t *driver_obj)
     // const usb_config_desc_t *config_desc;
     ESP_ERROR_CHECK(usb_host_get_active_config_descriptor(driver_obj->dev_hdl, &config_desc));
     num_of_interfaces = config_desc->bNumInterfaces;
+    const usb_ep_desc_t *ep;
+    int offset = 0;
     for (int i = 0; i < num_of_interfaces; i++)
     {
         int err = usb_host_interface_claim(driver_obj->client_hdl, driver_obj->dev_hdl, i, 0);
+        const usb_intf_desc_t *intf = usb_parse_interface_descriptor(config_desc, i, 0, &offset);
+        ep = usb_parse_endpoint_descriptor_by_index(intf, 0, config_desc->wTotalLength, &offset);
+        mps[i] = ep->wMaxPacketSize;
         ESP_LOGI("", "interface claim status: %d", err);
     }
     usb_print_config_descriptor(config_desc, NULL);
-    int offset = 0;
-    const usb_intf_desc_t *intf = usb_parse_interface_descriptor(config_desc, 0, 0, &offset);
-    ep = usb_parse_endpoint_descriptor_by_index(intf, 0, config_desc->wTotalLength, &offset);
+
     // Get the device's string descriptors next
     driver_obj->actions &= ~ACTION_GET_CONFIG_DESC;
     driver_obj->actions |= ACTION_GET_STR_DESC;
@@ -169,15 +172,20 @@ static void transfer_cb_ctrl(usb_transfer_t *transfer)
     ESP_LOGI(TAG, "--------------------------");
     ESP_LOGI(TAG, "Transfer status %d, actual number of bytes transferred %d\n", transfer->status, transfer->actual_num_bytes);
     usbip_ret_submit *ret = (usbip_ret_submit *)transfer->context;
-    int s = ret->actual_length;
     ret->actual_length = htonl(transfer->actual_num_bytes - 8);
     memcpy(&ret->transfer_buffer[0], transfer->data_buffer + 8, transfer->actual_num_bytes - 8);
 
     int len = 0;
-    if (s == 0)
+    if (ret->base.direction == 0)
+    {
+        ret->base.direction = 0;
         len = send(skt, ret, sizeof(usbip_ret_submit) - 1024, 0);
+    }
     else
+    {
+        ret->base.direction = 0;
         len = send(skt, ret, sizeof(usbip_ret_submit) - 1024 + transfer->actual_num_bytes - 8, 0);
+    }
     ESP_LOGI(TAG, "Submitted ret_submit header for transfer_ctrl_submit %d", len);
     ESP_LOGI(TAG, "--------------------------");
     usb_host_transfer_free(transfer);
@@ -188,9 +196,22 @@ static void transfer_cb(usb_transfer_t *transfer)
     ESP_LOGI(TAG, "--------------------------");
     ESP_LOGI(TAG, "Transfer status %d, actual number of bytes transferred %d", transfer->status, transfer->actual_num_bytes);
     usbip_ret_submit *ret = (usbip_ret_submit *)transfer->context;
-
-    memcpy(&ret->transfer_buffer[0], transfer->data_buffer, ntohl(ret->actual_length)); // ep->wMaxPacketSize
-    int len = send(skt, ret, sizeof(usbip_ret_submit) - 1024 + ntohl(ret->actual_length), 0);
+    int len = 0;
+    if (ret->base.direction != 0)
+    {
+        memcpy(&ret->transfer_buffer[0], transfer->data_buffer, ntohl(ret->actual_length));
+        ret->base.direction = 0;
+        ret->actual_length = ret->actual_length;
+        // usb_host_endpoint_halt(transfer->device_handle, transfer->bEndpointAddress);
+        // usb_host_endpoint_flush(transfer->device_handle, transfer->bEndpointAddress);
+        // usb_host_endpoint_clear(transfer->device_handle, transfer->bEndpointAddress);
+        len = send(skt, ret, sizeof(usbip_ret_submit) - 1024 + ntohl(ret->actual_length), 0);
+    }
+    else
+    {
+        ret->base.direction = 0;
+        len = send(skt, ret, sizeof(usbip_ret_submit) - 1024, 0);
+    }
     ESP_LOGI(TAG, "Submitted ret_submit header for transfer_submit %d", len);
     ESP_LOGI(TAG, "--------------------------");
     usb_host_transfer_free(transfer);
@@ -203,14 +224,14 @@ static void _usb_ip_event_handler_2(void *event_handler_arg, esp_event_base_t ev
     ret_submit->base.command = htonl(USBIP_RET_SUBMIT);
     ret_submit->base.seqnum = recv_submit->header.seqnum; // Add Seqnum
     ret_submit->base.devid = htonl(0x00000000);
-    ret_submit->base.direction = htonl(0x00000000);
+    ret_submit->base.direction = recv_submit->header.direction;
     ret_submit->base.ep = htonl(0x00000000);
 
     ret_submit->status = htonl(0x00000000);
     ret_submit->start_frame = htonl(0x00000000);
     ret_submit->number_of_packets = htonl(0x00000000);
     ret_submit->error_count = htonl(0x00000000);
-    ret_submit->actual_length = (ntohl(recv_submit->header.direction) == 1) ? recv_submit->cmd_submit.transfer_buffer_length : 0;
+    ret_submit->actual_length = recv_submit->cmd_submit.transfer_buffer_length; //(ntohl(recv_submit->header.direction) == 1) ? recv_submit->cmd_submit.transfer_buffer_length : 0;
 
     memset(ret_submit->padding, 0, sizeof(ret_submit->padding));
 
@@ -253,7 +274,7 @@ static void _usb_ip_event_handler_2(void *event_handler_arg, esp_event_base_t ev
         if (ntohl(recv_submit->header.direction) != 0)
         {
             // memset(transfer->data_buffer, 0x00, ep->wMaxPacketSize);
-            transfer->num_bytes = usb_round_up_to_mps(ntohl(recv_submit->cmd_submit.transfer_buffer_length), ep->wMaxPacketSize);
+            transfer->num_bytes = usb_round_up_to_mps(ntohl(recv_submit->cmd_submit.transfer_buffer_length), mps[ntohl(recv_submit->header.ep) - 1]); // ep->wMaxPacketSize
         }
         else
         {
@@ -270,18 +291,9 @@ static void _usb_ip_event_handler_2(void *event_handler_arg, esp_event_base_t ev
     ESP_LOGI(TAG, "--------------------------");
 }
 
-void get_usbip_ret_unlink(usbip_ret_unlink *dev)
+void init_unlink(uint32_t seqnum)
 {
-    // hardcoded
-    dev->base.command = htonl(USBIP_RET_UNLINK);
-    dev->base.seqnum = htonl(0x00000002);
-    dev->base.devid = htonl(0x00000000);
-    dev->base.direction = htonl(0x00000000);
-    dev->base.ep = htonl(0x00000000);
-
-    dev->status = htonl(-ECONNRESET);
-
-    memset(dev->padding, 0, sizeof(dev->padding));
+    // Discard the packet
 }
 
 void usb_class_driver_task(void *arg)
@@ -292,7 +304,7 @@ void usb_class_driver_task(void *arg)
 
     while (1)
     {
-        // memset(&driver_obj, 0, sizeof(class_driver_t));
+        memset(&driver_obj, 0, sizeof(class_driver_t));
 
         // Wait until daemon task has installed USB Host Library
         xSemaphoreTake(signaling_sem, portMAX_DELAY);

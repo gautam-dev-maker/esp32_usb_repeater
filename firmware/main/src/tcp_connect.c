@@ -78,24 +78,24 @@ static void do_recv()
 
                     case USBIP_CMD_UNLINK:
                     {
-                        // ESP_LOGI(TAG, "------In Unlink-------");
-                        // ESP_LOGI(TAG, "usbip header basic seqnum: %u", ntohl(header.seqnum));
-                        // ESP_LOGI(TAG, "usbip header basic devid: %u", ntohl(header.devid));
-                        // ESP_LOGI(TAG, "usbip header basic direcn: %u", ntohl(header.direction));
-                        // ESP_LOGI(TAG, "usbip header basic ep: %u", ntohl(header.ep));
-
                         usbip_cmd_unlink cmd_unlink;
                         len = recv(sock, &cmd_unlink, sizeof(usbip_cmd_unlink), 0);
-                        // ESP_LOGI(TAG, "usbip header basic ep: %u", ntohl(cmd_unlink.unlink_seqnum));
-                        // ESP_LOGI(TAG, "--------------------------");
+                        init_unlink(ntohl(cmd_unlink.unlink_seqnum));
 
                         /* TODO: REPLY with RET_UNLINK after error check*/
-                        // usbip_ret_unlink ret_unlink;
-                        // get_usbip_ret_unlink(&ret_unlink);
-                        // len = send(sock, &ret_unlink, sizeof(usbip_ret_unlink), 0);
-                        // ESP_LOGI(TAG, "Submitted ret_unlink %u", len);
+                        usbip_ret_unlink ret_unlink;
+                        ret_unlink.base.command = htonl(USBIP_RET_UNLINK);
+                        ret_unlink.base.seqnum = htonl(0x00000002);
+                        ret_unlink.base.devid = htonl(0x00000000);
+                        ret_unlink.base.direction = htonl(0x00000000);
+                        ret_unlink.base.ep = htonl(0x00000000);
+
+                        ret_unlink.status = htonl(0);
+
+                        memset(ret_unlink.padding, 0, 24);
+                        len = send(sock, &ret_unlink, sizeof(usbip_ret_unlink), 0);
+                        ESP_LOGI(TAG, "Submitted ret_unlink %u", len);
                         // ESP_LOGI(TAG, "--------------------------");/
-                        device_busy = false;
                         break;
                     }
                     default:
