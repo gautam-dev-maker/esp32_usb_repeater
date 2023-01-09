@@ -85,4 +85,29 @@ sudo ubsip detach -p <insert port number here>
 ## Result till date.
 ### Mouse and keyboard
 * Devices of the HID class, such as the mouse and keyboard, were successfully connected and tested.
-* The result .pcapng files can be found in test directory of the repository.
+* The result .pcapng files, for tcp connection between esp32s2 and pc, can be found in test directory of the repository.
+
+
+<!-- Debugging -->
+## Method used for debugging:
+* The wireshark files generated for the USBIP connection between the esp32s2 and the PC were compared to the wireshark files generated for the USBIP connection between two computers.
+
+
+<!-- Explaining the code -->
+## Code:
+### main.c
+* calls `tcp_server_init()` - begin the tcp server.
+* calls `usbip_server_init()` - register the event control loops and create task handling the host library.
+### tcp_connect.c
+* `tcp_server_init()` - initializes nvs flash, netif, example connect and returns ESP_OK.
+* `tcp_server_start()` - connects to the wifi and binds the socket. Creates task `do_recv` with idle priority.
+* `do_recv` - This task runs in the background indefinitely and listens for messages from the client over IP. If device_busy is set to false, no device is connected, and the client can request a list of devices or import a device. If device_busy is true, the connection has already been established. This task sends the received data to two separate event loops, one for op_rep_import and one for usbip_ret_submit.
+### usb_handler.c
+* `usb_host_lib_daemon_task()` - installs host library and deletes it when there are no devices connected. Continuosly checks whether the devices are connected or not.
+* `usb_class_driver_task()` - registers client and event control loop for ret_submit, opens device and creates task `tcp_server_task()`.
+* `_usb_ip_event_handler_2()` - event loop to submit control and non control transfers to the device.
+* `transfer_cb()` - call back function registered for non-control transfers.
+* `transfer_cb_ctrl()` - call back function registered for control transfers.
+### usbip_server.c
+* `usbip_server_init()` - register the event control loops and create task handling the host library.
+* `_usb_ip_event_handler_1()` - event loop to send responses for op_req_devlist and op_req_import.
