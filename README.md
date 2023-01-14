@@ -9,6 +9,7 @@ A Over the Wifi ESP32 USB Repeater
 
 ### File Structure
      .
+    ├── assets                        # Contains flowchart.
     ├── firmware                      # Contains files of specific library of functions or Hardware used.
     │    ├── main                     # Source files of project
     │        ├──include               # Header files of the code.
