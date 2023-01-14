@@ -26,6 +26,8 @@
 #define KEEPALIVE_INTERVAL          5
 #define KEEPALIVE_COUNT             3
 
+ESP_EVENT_DECLARE_BASE(USBIP_EVENT_BASE);
+
 esp_err_t tcp_server_init(void);
 void tcp_server_start(void *pvParameters);
 #endif

@@ -12,7 +12,10 @@ extern TaskHandle_t *tcp_server_task;
 extern TaskHandle_t *usb_daemon_task_hdl;
 extern TaskHandle_t *usb_class_driver_task_hdl;
 
-extern struct class_driver_t driver_obj;
+extern esp_event_loop_handle_t loop_handle;
+extern esp_event_loop_handle_t loop_handle2;
+
+// extern struct class_driver_t driver_obj;
 
 /* This variable is used to determine whether the USB device is bind to any of the network */
 extern bool device_busy;

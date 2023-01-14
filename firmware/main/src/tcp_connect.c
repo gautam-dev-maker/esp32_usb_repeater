@@ -1,9 +1,14 @@
 #include "tcp_connect.h"
+// #include <errno.h>
 
 #define TAG "TCP_CONNECT"
 
 /* TODO: Make the variable "device_busy" false if the usb is unbound */
 bool device_busy = false;
+static int sock;
+static submit recv_submit;
+// static ssize_t size;
+// static char rx_buffer[128];
 
 esp_err_t tcp_server_init(void)
 {
@@ -15,75 +20,96 @@ esp_err_t tcp_server_init(void)
     return ESP_OK;
 }
 
-static void do_recv(const int sock)
+static void do_recv()
 {
     int len;
-    if (!device_busy)
+    usbip_header_common dev_recv;
+    while (1)
     {
-        op_req_devlist dev_recv;
-        len = recv(sock, &dev_recv, sizeof(op_req_devlist), 0);
-        if (len < 0)
+        if (!device_busy)
         {
-            ESP_LOGE(TAG, "Error occurred during receiving: errno %d", errno);
-        }
-        else if (len == 0)
-        {
-            ESP_LOGW(TAG, "Connection closed");
-        }
-        else if (ntohs(dev_recv.usbip_version) == USBIP_VERSION)
-        {
-            switch (ntohs(dev_recv.command_code))
+            // usbip_header_common dev_recv;
+            len = recv(sock, &dev_recv, sizeof(usbip_header_common), MSG_DONTWAIT);
+            if (len < 0)
             {
-            case OP_REQ_DEVLIST:;
-                op_rep_devlist dev_tcp;
-                get_op_rep_devlist(&dev_tcp);
-                send(sock, &dev_tcp, sizeof(op_rep_devlist), 0);
-                break;
-
-            case OP_REQ_IMPORT:;
-                /* TODO: perform error check as perfomed above after receiving */
-                op_req_import dev_import;
-                recv(sock, dev_import.bus_id, sizeof(op_req_import) - sizeof(op_req_devlist), 0);
-                if (!strcmp(BUS_ID, dev_import.bus_id))
-                {
-                    ESP_LOGI(TAG, "BUS-ID matches for requested import device");
-
-                    /* TODO: send a "op_rep_import" struct as a reply */
-                    op_rep_import rep_import;
-                    get_op_rep_import(&rep_import);
-                    send(sock, &rep_import, sizeof(op_rep_import), 0);
-
-                    /* TODO: if send is successful set device_busy true */
-                }
-                else
-                {
-                    ESP_LOGE(TAG, "Received different BUS ID");
-                    /* TODO: reply with "1" status to show error in connection*/
-                }
-                break;
+                ESP_LOGE(TAG, "Error occurred during receiving: errno %d", errno);
+            }
+            else if (len == 0)
+            {
+                ESP_LOGW(TAG, "Connection closed");
+            }
+            else if (ntohs(dev_recv.usbip_version) == USBIP_VERSION)
+            {
+                tcp_data buffer;
+                buffer.sock = sock;
+                buffer.len = sizeof(usbip_header_common);
+                buffer.rx_buffer = (uint8_t *)&dev_recv;
+                esp_event_post_to(loop_handle, USBIP_EVENT_BASE, ntohs(dev_recv.command_code), (void *)&buffer, sizeof(tcp_data), 10);
             }
         }
-    }
-    else
-    {
-        /* TODO : Start dealing with URB command codes */
-        usbip_header_basic header;
-        len = recv(sock, &header, sizeof(usbip_header_basic), 0);
-        if (ntohs(header.usbip_version) == USBIP_VERSION)
+        if (device_busy)
         {
-            switch (ntohl(header.command_code))
+            /* TODO : Start dealing with URB command codes */
+            usbip_header_basic header;
+            len = 0;
+            while (1)
             {
-            case USBIP_CMD_SUBMIT:;
-                /* TODO: REPLY with USBIP_CMD_REP */
-                break;
+                len = recv(sock, &header, sizeof(usbip_header_basic), 0);
 
-            case USBIP_CMD_UNLINK:;
-                /* TODO: REPLY with */
-                /* TODO: change device_busy variable to free */
-                break;
+                if (len > 0)
+                {
+                    switch (ntohl(header.command))
+                    {
+                    case USBIP_CMD_SUBMIT:
+                    {
+                        /* TODO: REPLY with USBIP_RET_SUBMIT */
+                        usbip_cmd_submit cmd_submit;
+                        len += recv(sock, &cmd_submit, sizeof(usbip_cmd_submit) - 1024, MSG_DONTWAIT);
+                        if (ntohl(header.direction) == 0)
+                            len += recv(sock, &cmd_submit.transfer_buffer[0], ntohl(cmd_submit.transfer_buffer_length), MSG_DONTWAIT); // get_usbip_ret_submit(&cmd_submit, &header, sock);
+                        recv_submit.header = header;
+                        recv_submit.cmd_submit = cmd_submit;
+                        recv_submit.sock = sock;
+                        if (len > 20)
+                            esp_event_post_to(loop_handle2, USBIP_EVENT_BASE, USBIP_CMD_SUBMIT, (void *)&recv_submit, sizeof(submit), 10);
+                        len = 0;
+                        break;
+                    }
+
+                    case USBIP_CMD_UNLINK:
+                    {
+                        usbip_cmd_unlink cmd_unlink;
+                        len = recv(sock, &cmd_unlink, sizeof(usbip_cmd_unlink), 0);
+                        init_unlink(ntohl(cmd_unlink.unlink_seqnum));
+
+                        /* TODO: REPLY with RET_UNLINK after error check*/
+                        usbip_ret_unlink ret_unlink;
+                        ret_unlink.base.command = htonl(USBIP_RET_UNLINK);
+                        ret_unlink.base.seqnum = htonl(0x00000002);
+                        ret_unlink.base.devid = htonl(0x00000000);
+                        ret_unlink.base.direction = htonl(0x00000000);
+                        ret_unlink.base.ep = htonl(0x00000000);
+
+                        ret_unlink.status = htonl(0);
+
+                        memset(ret_unlink.padding, 0, 24);
+                        len = send(sock, &ret_unlink, sizeof(usbip_ret_unlink), 0);
+                        ESP_LOGI(TAG, "Submitted ret_unlink %u", len);
+                        // ESP_LOGI(TAG, "--------------------------");/
+                        break;
+                    }
+                    default:
+                        printf("SUCCESS\n");
+                        break;
+                    }
+                }
             }
         }
+
+        if (!device_busy)
+            break;
     }
+    vTaskDelete(NULL);
 }
 
 void tcp_server_start(void *pvParameters)
@@ -138,7 +164,7 @@ void tcp_server_start(void *pvParameters)
 
         struct sockaddr_storage source_addr; // Large enough for both IPv4 or IPv6
         socklen_t addr_len = sizeof(source_addr);
-        int sock = accept(listen_sock, (struct sockaddr *)&source_addr, &addr_len);
+        sock = accept(listen_sock, (struct sockaddr *)&source_addr, &addr_len);
         if (sock < 0)
         {
             ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
@@ -147,19 +173,20 @@ void tcp_server_start(void *pvParameters)
 
         // Set tcp keepalive option
         setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(int));
-        setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(int));
-        setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(int));
-        setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(int));
+        setsockopt(sock, IPPROTO_TCP, 4, &keepIdle, sizeof(int));
+        setsockopt(sock, IPPROTO_TCP, 5, &keepInterval, sizeof(int));
+        setsockopt(sock, IPPROTO_TCP, 6, &keepCount, sizeof(int));
 
         // Convert ipv4 address to string
-        inet_ntoa_r(((struct sockaddr_in *)&source_addr)->sin_addr, addr_str, sizeof(addr_str) - 1);
+        if (source_addr.ss_family == PF_INET)
+        {
+            inet_ntoa_r(((struct sockaddr_in *)&source_addr)->sin_addr, addr_str, sizeof(addr_str) - 1);
+        }
 
-        ESP_LOGI(TAG, "Socket accepted ip address: %s", addr_str);
+        xTaskCreatePinnedToCore(do_recv, "tcp_recv", 2 * 4096, NULL, tskIDLE_PRIORITY, NULL, 1);
 
-        do_recv(sock);
-
-        shutdown(sock, 0);
-        close(sock);
+        // shutdown(sock, 0);
+        // close(sock);
     }
 CLEAN_UP:
     close(listen_sock);
