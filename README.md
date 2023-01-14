@@ -9,7 +9,7 @@ A Over the Wifi ESP32 USB Repeater
 
 ### File Structure
      .
-    ├── assets                        # Contains flowchart.
+    ├── Test                          # Contains captured TCP packets for usbip.
     ├── firmware                      # Contains files of specific library of functions or Hardware used.
     │    ├── main                     # Source files of project
     │        ├──include               # Header files of the code.
@@ -24,7 +24,7 @@ A Over the Wifi ESP32 USB Repeater
     │        │     ├──usbip_server.c  # Handles Usbip server.
     │        ├──CMakeLists.txt        # To include source code files in esp-idf.
     │    ├──CMakeLists.txt            # To include this component in a esp-idf.
-    ├── Test
+    ├── assets                        # Contains flowchart.
     ├── LICENSE
     └── README.md 
     
@@ -91,7 +91,7 @@ sudo ubsip detach -p <insert port number here>
 
 <!-- Debugging -->
 ## Method used for debugging:
-* The wireshark files generated for the USBIP connection between the esp32s2 and the PC were compared to the wireshark files generated for the USBIP connection between two computers.
+* The wireshark files generated for the USBIP connection between the esp32s2 and the PC were compared to the wireshark files generated for the USBIP connection between two computers. The TCP capture is uploaded in the test folder.
 
 
 <!-- Explaining the code -->
@@ -115,3 +115,7 @@ sudo ubsip detach -p <insert port number here>
 
 ## FLowchart:
 ![ Flowchart ](https://github.com/gautam-dev-maker/esp32_usb_repeater/blob/dev_viraj/assets/flow_of_code.png)
+
+<p>
+<img src = "https://github.com/gautam-dev-maker/esp32_usb_repeater/blob/dev_viraj/assets/flow_of_code.png" alt = "Flowchart" width = "550" height = "600"/>
+</p>
