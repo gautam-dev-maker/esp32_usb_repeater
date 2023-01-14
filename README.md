@@ -40,7 +40,7 @@ A Over the Wifi ESP32 USB Repeater
 ### Installation
 Clone the repo
 ```ssh
-git@github.com:gautam-dev-maker/esp32_usb_repeater.git
+git clone git@github.com:gautam-dev-maker/esp32_usb_repeater.git
 ```
 
 <!-- USAGE EXAMPLES -->
@@ -111,3 +111,6 @@ sudo ubsip detach -p <insert port number here>
 ### usbip_server.c
 * `usbip_server_init()` - register the event control loops and create task handling the host library.
 * `_usb_ip_event_handler_1()` - event loop to send responses for op_req_devlist and op_req_import.
+
+## FLowchart:
+![ Flowchart ](https://github.com/gautam-dev-maker/esp32_usb_repeater/blob/dev_viraj/assets/flow_of_code.png)
